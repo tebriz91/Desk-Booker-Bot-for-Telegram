@@ -4,7 +4,7 @@
 
 This Telegram bot, **Desk Booker**, is designed to facilitate desk booking in a hybrid office environment. It's ideal for office workers who work in a hybrid mode and need to book desks on days they plan to be in the office. The bot integrates seamlessly with Telegram, making it easy for coworkers to manage their bookings.
 
-![Bot Start and Main Menu](link-to-image)
+![Text](/assets/images/screencast.gif?raw=true)
 
 ## Features
 - **Desk Booking**: Book a desk for a specific date.

@@ -107,13 +107,15 @@ def manage_users_interaction(update: Update, context: CallbackContext) -> None:
 
     if user and user[0]:
         # User is an admin
-        message_text = "Admin User Management:\n"
+        message_text = "Admin User Management:\n\n"
         message_text += "/add_user [user_id] [username] - Add a new user (enter username without @)\n"
         message_text += "/make_admin [user_id] - Make a user an admin\n"
         message_text += "/blacklist_user [user_id] - Blacklist a user\n"
         message_text += "/remove_user [user_id] - Remove a user\n"
         message_text += "/revoke_admin [user_id] - Revoke admin status\n"
-        message_text += "/view_users - View all users and their status"
+        message_text += "/view_users - View all users and their status\n"
+        message_text += "/history - View all booking history for the past 2 weeks\n"
+        message_text += "/cancel_booking - Cancel a booking by it's id (ids are shown when /history command is activated)"
         query.edit_message_text(text=message_text)
     else:
         query.edit_message_text(text="You do not have permission to manage users.")
@@ -237,6 +239,30 @@ def view_users(update: Update, context: CallbackContext) -> None:
 
     update.message.reply_text(message_text)
 
+def cancel_booking_by_id(update: Update, context: CallbackContext) -> None:
+    user_id = str(update.effective_user.id)
+    if not is_admin(user_id, users_db_path):
+        update.message.reply_text("You are not authorized to use this command.")
+        return
+
+    if len(context.args) != 1 or not context.args[0].isdigit():
+        update.message.reply_text("Usage: /cancel_booking [id]")
+        return
+
+    booking_id = context.args[0]
+
+    conn = sqlite3.connect(bookings_db_path)
+    c = conn.cursor()
+    c.execute("DELETE FROM bookings WHERE id = ?", (booking_id,))
+    changes = conn.total_changes
+    conn.commit()
+    conn.close()
+
+    if changes > 0:
+        update.message.reply_text(f"Booking with ID {booking_id} cancelled successfully.")
+    else:
+        update.message.reply_text(f"No booking found with ID {booking_id}.")
+
 def start(update: Update, context: CallbackContext) -> None:
     user_id = str(update.effective_user.id)
 
@@ -251,7 +277,7 @@ def start(update: Update, context: CallbackContext) -> None:
 
     if user is None:
         # If user does not exist, inform them that they need to be registered by an admin
-        update.message.reply_text("You are not registered. Please contact an admin (CONTACTS) to use this bot.")
+        update.message.reply_text("You are not registered. Please contact an admin (@tebriz91) to use this bot.")
         return
 
     is_admin, is_blacklisted = user
@@ -265,7 +291,7 @@ def start(update: Update, context: CallbackContext) -> None:
         [InlineKeyboardButton("Book a Table", callback_data='book_table'),
          InlineKeyboardButton("Cancel Booking", callback_data='cancel_booking')],
         [InlineKeyboardButton("View My Bookings", callback_data='view_my_bookings'),
-         InlineKeyboardButton("View All Bookings", callback_data='view_all_bookings')] # Moved this button out of the is_admin check
+         InlineKeyboardButton("View All Bookings", callback_data='view_all_bookings')]
     ]
 
     if is_admin:
@@ -326,7 +352,10 @@ def book_time(update: Update, context: CallbackContext) -> None:
 
         if existing_booking:
             table_id = existing_booking[0]
-            update.callback_query.message.reply_text(f"You have already booked Table {table_id} for {booking_date}. Please choose another date or cancel your existing booking.")
+            if update.callback_query:
+                update.callback_query.edit_message_text(f"You have already booked Table {table_id} for {booking_date}. Please choose another date or cancel your existing booking.")
+            else:
+                update.message.reply_text(f"You have already booked Table {table_id} for {booking_date}. Please choose another date or cancel your existing booking.")
             return
 
         # Generate buttons for all tables, marking availability
@@ -346,9 +375,15 @@ def book_time(update: Update, context: CallbackContext) -> None:
                 keyboard.append([button])
 
         reply_markup = InlineKeyboardMarkup(keyboard)
-        update.callback_query.message.reply_text(f"Select a table for {booking_date}:", reply_markup=reply_markup)
+        if update.callback_query:
+            update.callback_query.edit_message_text(f"Select a table for {booking_date}:", reply_markup=reply_markup)
+        else:
+            update.message.reply_text(f"Select a table for {booking_date}:", reply_markup=reply_markup)
     else:
-        update.callback_query.message.reply_text("Please select a date first")
+        if update.callback_query:
+            update.callback_query.edit_message_text("Please select a date first")
+        else:
+            update.message.reply_text("Please select a date first")
 
 def process_booking(update: Update, context: CallbackContext, table_id: int) -> None:
     booking_date = context.user_data['selected_date']
@@ -378,10 +413,10 @@ def process_booking(update: Update, context: CallbackContext, table_id: int) -> 
         conn.close()
 
     # Respond according to the type of update
-    if update.message:
+    if update.callback_query:
+        update.callback_query.edit_message_text(response_text)
+    else:
         update.message.reply_text(response_text)
-    elif update.callback_query:
-        update.callback_query.message.reply_text(response_text)
     start(update, context)
 
 def display_bookings_for_cancellation(update: Update, context: CallbackContext) -> None:
@@ -412,9 +447,13 @@ def display_bookings_for_cancellation(update: Update, context: CallbackContext) 
     if bookings:
         keyboard = [[InlineKeyboardButton(f"Cancel Table {table_id} on {booking_date}", callback_data=f'cancel_{booking_id}')] for booking_id, booking_date, table_id in bookings]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        update.callback_query.message.reply_text("Select a booking to cancel:", reply_markup=reply_markup)
+        # Check if the function is triggered by a callback query or a regular command
+        if update.callback_query:
+            update.callback_query.edit_message_text("Select a booking to cancel:", reply_markup=reply_markup)
+        else:
+            update.message.reply_text("Select a booking to cancel:", reply_markup=reply_markup)
     else:
-        update.callback_query.message.reply_text("You have no upcoming bookings to cancel.")
+        update.message.reply_text("You have no upcoming bookings to cancel.")
 
 def cancel_booking(update: Update, context: CallbackContext) -> None:
     logger.info("Cancel booking function called")
@@ -462,7 +501,10 @@ def view_my_bookings(update: Update, context: CallbackContext) -> None:
     else:
         message_text = "You have no upcoming bookings."
 
-    update.callback_query.message.reply_text(message_text)
+    if update.callback_query:
+        update.callback_query.edit_message_text(message_text)
+    else:
+        update.message.reply_text(message_text)
 
 def view_all_bookings(update: Update, context: CallbackContext) -> None:
     conn = sqlite3.connect(bookings_db_path)
@@ -503,14 +545,14 @@ def view_all_bookings(update: Update, context: CallbackContext) -> None:
     else:
         message_text = "No bookings for the next week."
 
-    update.callback_query.message.reply_text(message_text)
+    if update.callback_query:
+        update.callback_query.edit_message_text(message_text)
+    else:
+        update.message.reply_text(message_text)
 
-# Function to view booking history for the past two weeks
 def view_booking_history(update: Update, context: CallbackContext) -> None:
-    admin_id = 'TELEGRAM_ID'  # Your Telegram ID as admin
     user_id = str(update.effective_user.id)
-
-    if user_id != admin_id:
+    if not is_admin(user_id, users_db_path):
         update.message.reply_text("You are not authorized to use this command.")
         return
 
@@ -520,7 +562,7 @@ def view_booking_history(update: Update, context: CallbackContext) -> None:
     two_weeks_ago = (datetime.now() - timedelta(days=14)).strftime('%Y-%m-%d')
 
     c.execute("""
-        SELECT booking_date, table_id, username
+        SELECT id, booking_date, table_id, username
         FROM bookings 
         WHERE 
             SUBSTR(booking_date, 7, 4) || '-' || 
@@ -536,10 +578,11 @@ def view_booking_history(update: Update, context: CallbackContext) -> None:
 
     if bookings:
         bookings_by_date = {}
-        for booking_date, table_id, username in bookings:
+        for booking_id, booking_date, table_id, username in bookings:
             if booking_date not in bookings_by_date:
                 bookings_by_date[booking_date] = []
-            bookings_by_date[booking_date].append(f"Table: {table_id}, User: {username}")
+            # Updated format: Table ID, Username, Booking ID
+            bookings_by_date[booking_date].append(f"Table: {table_id}, User: {username}, ID: {booking_id}")
 
         message_text = "Booking history for the past two weeks:\n\n"
         for date, bookings_list in bookings_by_date.items():
@@ -571,6 +614,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("revoke_admin", revoke_admin))
     dispatcher.add_handler(CommandHandler("manage_users", manage_users))
     dispatcher.add_handler(CommandHandler("view_users", view_users))
+    dispatcher.add_handler(CommandHandler("cancel_booking", cancel_booking_by_id))
     # Add other necessary handlers
 
     # Start the Bot

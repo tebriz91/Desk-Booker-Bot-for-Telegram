@@ -50,7 +50,7 @@ users_cursor.execute('''
 ''')
 
 # Insert admin record (your record) if not exists
-admin_user_id = 'TELEGRAM_ID'  # Your Telegram user ID
+admin_user_id = 'TELEGRAM_USERID'  # Your Telegram user ID
 admin_username = 'TELEGRAM_USERNAME'  # Your Telegram username
 
 users_cursor.execute('''
@@ -331,35 +331,30 @@ def button(update: Update, context: CallbackContext) -> None:
         view_my_bookings(update, context)
     elif query.data == 'view_all_bookings':
         view_all_bookings(update, context)
-    # Add handling for other callback_data options (cancel_booking, view_my_bookings, view_all_bookings)
+    # Add handling for other callback_data options
 
-def display_bookings_for_cancellation(update: Update, context: CallbackContext) -> None:
-    logger.info("Display bookings for cancellation function called")
-    user_id = update.effective_user.id
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute("SELECT id, booking_date, table_id FROM bookings WHERE user_id = ?", (user_id,))
-    bookings = c.fetchall()
-    conn.close()
+def start_booking_process(update: Update, context: CallbackContext) -> None:
+    dates = generate_dates()
+    keyboard = [[InlineKeyboardButton(date, callback_data=f'date_{date}')] for date in dates]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text("Select a date to book:", reply_markup=reply_markup)
 
-    if bookings:
-        keyboard = [[InlineKeyboardButton(f"Cancel Table {table_id} on {booking_date}", callback_data=f'cancel_{booking_id}')] for booking_id, booking_date, table_id in bookings]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        update.callback_query.message.reply_text("Select a booking to cancel:", reply_markup=reply_markup)
-    else:
-        update.callback_query.message.reply_text("You have no bookings to cancel.")
+def book_time(update: Update, context: CallbackContext) -> None:
+    if 'selected_date' in context.user_data:
+        booking_date = context.user_data['selected_date']
+        user_id = update.effective_user.id
 
-def cancel_booking(update: Update, context: CallbackContext) -> None:
-    logger.info("Cancel booking function called")
-    query = update.callback_query
-    booking_id = query.data.split('_')[1]
-    user_id = update.effective_user.id
+        conn = sqlite3.connect(bookings_db_path)
+        c = conn.cursor()
 
-    conn = sqlite3.connect(db_path)
-    c = conn.cursor()
-    c.execute("DELETE FROM bookings WHERE id = ? AND user_id = ?", (booking_id, user_id))
-    conn.commit()
-    conn.close()
+        # Check if the user already has a booking for the selected date
+        c.execute("SELECT table_id FROM bookings WHERE booking_date = ? AND user_id = ?", (booking_date, user_id))
+        existing_booking = c.fetchone()
+
+        # Retrieve all booked tables for the selected date
+        c.execute("SELECT table_id FROM bookings WHERE booking_date = ?", (booking_date,))
+        booked_tables = [row[0] for row in c.fetchall()]
+        conn.close()
 
         if existing_booking:
             table_id = existing_booking[0]
@@ -616,6 +611,20 @@ def main() -> None:
     dispatcher.add_handler(CallbackQueryHandler(cancel_booking, pattern='^cancel_'))
     dispatcher.add_handler(CallbackQueryHandler(view_my_bookings, pattern='^view_my_bookings$'))
     dispatcher.add_handler(CallbackQueryHandler(view_all_bookings, pattern='^view_all_bookings$'))
+    dispatcher.add_handler(CommandHandler("history", view_booking_history))
+    dispatcher.add_handler(CallbackQueryHandler(manage_users_interaction, pattern='^manage_users$'))
+    dispatcher.add_handler(CommandHandler("add_user", add_user))
+    dispatcher.add_handler(CommandHandler("make_admin", make_admin))
+    dispatcher.add_handler(CommandHandler("blacklist_user", blacklist_user))
+    dispatcher.add_handler(CommandHandler("remove_user", remove_user))
+    dispatcher.add_handler(CommandHandler("revoke_admin", revoke_admin))
+    dispatcher.add_handler(CommandHandler("manage_users", manage_users))
+    dispatcher.add_handler(CommandHandler("view_users", view_users))
+    dispatcher.add_handler(CommandHandler("cancel_booking", cancel_booking_by_id))
+    dispatcher.add_handler(CommandHandler("book", start_booking_process)) 
+    dispatcher.add_handler(CommandHandler("cancel", display_bookings_for_cancellation))  # /cancel to trigger display_bookings_for_cancellation
+    dispatcher.add_handler(CommandHandler("my_bookings", view_my_bookings))  # /my_bookings to trigger view_my_bookings
+    dispatcher.add_handler(CommandHandler("all_bookings", view_all_bookings))  # /all_bookings to trigger view_all_bookings
     # Add other necessary handlers
 
     # Start the Bot

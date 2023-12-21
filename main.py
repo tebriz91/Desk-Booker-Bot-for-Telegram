@@ -1,5 +1,3 @@
-#telegram bot for booking tables by coworkers in a hybrid office work schedule
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, Filters
 from datetime import datetime, timedelta
@@ -19,12 +17,6 @@ os.makedirs(os.path.dirname(users_db_path), exist_ok=True)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                      level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Create a SQLite database connection
-conn = sqlite3.connect(bookings_db_path)
-
-# Create a cursor object
-c = conn.cursor()
 
 # Initialize the bookings database
 bookings_conn = sqlite3.connect(bookings_db_path)
@@ -91,9 +83,6 @@ def manage_users(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("You do not have permission to manage users.")
 
 def manage_users_interaction(update: Update, context: CallbackContext) -> None:
-    query = update.callback_query
-    query.answer()
-
     user_id = str(update.effective_user.id)
 
     # Connect to the users database
@@ -116,9 +105,17 @@ def manage_users_interaction(update: Update, context: CallbackContext) -> None:
         message_text += "/view_users - View all users and their status\n"
         message_text += "/history - View all booking history for the past 2 weeks\n"
         message_text += "/cancel_booking - Cancel a booking by it's id (ids are shown when /history command is activated)"
-        query.edit_message_text(text=message_text)
+
+        # Check if triggered by a command or inline keyboard
+        if update.callback_query:
+            update.callback_query.edit_message_text(text=message_text)
+        else:
+            update.message.reply_text(text=message_text)
     else:
-        query.edit_message_text(text="You do not have permission to manage users.")
+        if update.callback_query:
+            update.callback_query.edit_message_text(text="You do not have permission to manage users.")
+        else:
+            update.message.reply_text("You do not have permission to manage users.")
 
 def add_user(update: Update, context: CallbackContext) -> None:
     user_id = str(update.effective_user.id)
@@ -263,44 +260,6 @@ def cancel_booking_by_id(update: Update, context: CallbackContext) -> None:
     else:
         update.message.reply_text(f"No booking found with ID {booking_id}.")
 
-def start(update: Update, context: CallbackContext) -> None:
-    user_id = str(update.effective_user.id)
-
-    # Connect to the users database
-    users_conn = sqlite3.connect(users_db_path)
-    users_cursor = users_conn.cursor()
-
-    # Check if the user exists in the users database
-    users_cursor.execute("SELECT is_admin, is_blacklisted FROM users WHERE user_id = ?", (user_id,))
-    user = users_cursor.fetchone()
-    users_conn.close()
-
-    if user is None:
-        # If user does not exist, inform them that they need to be registered by an admin
-        update.message.reply_text("You are not registered. Please contact an admin (@tebriz91) to use this bot.")
-        return
-
-    is_admin, is_blacklisted = user
-
-    if is_blacklisted:
-        update.message.reply_text("You are blacklisted and cannot use this bot.")
-        return
-
-    # Define keyboard based on user status
-    keyboard = [
-        [InlineKeyboardButton("Book a Table", callback_data='book_table'),
-         InlineKeyboardButton("Cancel Booking", callback_data='cancel_booking')],
-        [InlineKeyboardButton("View My Bookings", callback_data='view_my_bookings'),
-         InlineKeyboardButton("View All Bookings", callback_data='view_all_bookings')]
-    ]
-
-    if is_admin:
-        # Additional options for admin users
-        keyboard.append([InlineKeyboardButton("Manage Users", callback_data='manage_users')])
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text('Please choose an option:', reply_markup=reply_markup)
-
 def generate_dates():
     dates = []
     current_date = datetime.now()
@@ -334,6 +293,28 @@ def button(update: Update, context: CallbackContext) -> None:
     # Add handling for other callback_data options
 
 def start_booking_process(update: Update, context: CallbackContext) -> None:
+    user_id = str(update.effective_user.id)
+
+    # Connect to the users database
+    users_conn = sqlite3.connect(users_db_path)
+    users_cursor = users_conn.cursor()
+
+    # Check if the user exists in the users database
+    users_cursor.execute("SELECT is_admin, is_blacklisted FROM users WHERE user_id = ?", (user_id,))
+    user = users_cursor.fetchone()
+    users_conn.close()
+
+    if user is None:
+        # If user does not exist, inform them that they need to be registered by an admin
+        update.message.reply_text("You are not registered. Please contact an admin (@tebriz91) to use this bot.")
+        return
+
+    is_admin, is_blacklisted = user
+
+    if is_blacklisted:
+        update.message.reply_text("You are blacklisted and cannot use this bot.")
+        return
+
     dates = generate_dates()
     keyboard = [[InlineKeyboardButton(date, callback_data=f'date_{date}')] for date in dates]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -426,6 +407,28 @@ def process_booking(update: Update, context: CallbackContext, table_id: int) -> 
     start(update, context)
 
 def display_bookings_for_cancellation(update: Update, context: CallbackContext) -> None:
+    user_id = str(update.effective_user.id)
+
+    # Connect to the users database
+    users_conn = sqlite3.connect(users_db_path)
+    users_cursor = users_conn.cursor()
+
+    # Check if the user exists in the users database
+    users_cursor.execute("SELECT is_admin, is_blacklisted FROM users WHERE user_id = ?", (user_id,))
+    user = users_cursor.fetchone()
+    users_conn.close()
+
+    if user is None:
+        # If user does not exist, inform them that they need to be registered by an admin
+        update.message.reply_text("You are not registered. Please contact an admin (@tebriz91) to use this bot.")
+        return
+
+    is_admin, is_blacklisted = user
+
+    if is_blacklisted:
+        update.message.reply_text("You are blacklisted and cannot use this bot.")
+        return
+
     logger.info("Display bookings for cancellation function called")
     user_id = update.effective_user.id
     conn = sqlite3.connect(bookings_db_path)
@@ -462,6 +465,28 @@ def display_bookings_for_cancellation(update: Update, context: CallbackContext) 
         update.message.reply_text("You have no upcoming bookings to cancel.")
 
 def cancel_booking(update: Update, context: CallbackContext) -> None:
+    user_id = str(update.effective_user.id)
+
+    # Connect to the users database
+    users_conn = sqlite3.connect(users_db_path)
+    users_cursor = users_conn.cursor()
+
+    # Check if the user exists in the users database
+    users_cursor.execute("SELECT is_admin, is_blacklisted FROM users WHERE user_id = ?", (user_id,))
+    user = users_cursor.fetchone()
+    users_conn.close()
+
+    if user is None:
+        # If user does not exist, inform them that they need to be registered by an admin
+        update.message.reply_text("You are not registered. Please contact an admin (@tebriz91) to use this bot.")
+        return
+
+    is_admin, is_blacklisted = user
+
+    if is_blacklisted:
+        update.message.reply_text("You are blacklisted and cannot use this bot.")
+        return
+
     logger.info("Cancel booking function called")
     query = update.callback_query
     booking_id = query.data.split('_')[1]
@@ -477,6 +502,28 @@ def cancel_booking(update: Update, context: CallbackContext) -> None:
     start(update, context)
 
 def view_my_bookings(update: Update, context: CallbackContext) -> None:
+    user_id = str(update.effective_user.id)
+
+    # Connect to the users database
+    users_conn = sqlite3.connect(users_db_path)
+    users_cursor = users_conn.cursor()
+
+    # Check if the user exists in the users database
+    users_cursor.execute("SELECT is_admin, is_blacklisted FROM users WHERE user_id = ?", (user_id,))
+    user = users_cursor.fetchone()
+    users_conn.close()
+
+    if user is None:
+        # If user does not exist, inform them that they need to be registered by an admin
+        update.message.reply_text("You are not registered. Please contact an admin (@tebriz91) to use this bot.")
+        return
+
+    is_admin, is_blacklisted = user
+
+    if is_blacklisted:
+        update.message.reply_text("You are blacklisted and cannot use this bot.")
+        return
+
     user_id = update.effective_user.id
     conn = sqlite3.connect(bookings_db_path)
     c = conn.cursor()
@@ -513,6 +560,28 @@ def view_my_bookings(update: Update, context: CallbackContext) -> None:
         update.message.reply_text(message_text)
 
 def view_all_bookings(update: Update, context: CallbackContext) -> None:
+    user_id = str(update.effective_user.id)
+
+    # Connect to the users database
+    users_conn = sqlite3.connect(users_db_path)
+    users_cursor = users_conn.cursor()
+
+    # Check if the user exists in the users database
+    users_cursor.execute("SELECT is_admin, is_blacklisted FROM users WHERE user_id = ?", (user_id,))
+    user = users_cursor.fetchone()
+    users_conn.close()
+
+    if user is None:
+        # If user does not exist, inform them that they need to be registered by an admin
+        update.message.reply_text("You are not registered. Please contact an admin (@tebriz91) to use this bot.")
+        return
+
+    is_admin, is_blacklisted = user
+
+    if is_blacklisted:
+        update.message.reply_text("You are blacklisted and cannot use this bot.")
+        return
+
     conn = sqlite3.connect(bookings_db_path)
     c = conn.cursor()
 
@@ -605,27 +674,27 @@ def main() -> None:
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
 
-    dispatcher.add_handler(CommandHandler("start", start))
+    # Register command handlers for various functionalities
+    dispatcher.add_handler(CommandHandler("book", start_booking_process)) 
+    dispatcher.add_handler(CommandHandler("cancel", display_bookings_for_cancellation))
+    dispatcher.add_handler(CommandHandler("my_bookings", view_my_bookings))
+    dispatcher.add_handler(CommandHandler("all_bookings", view_all_bookings))
+    dispatcher.add_handler(CommandHandler("history", view_booking_history))
+    dispatcher.add_handler(CommandHandler("add_user", add_user))
+    dispatcher.add_handler(CommandHandler("remove_user", remove_user))
+    dispatcher.add_handler(CommandHandler("make_admin", make_admin))
+    dispatcher.add_handler(CommandHandler("revoke_admin", revoke_admin))
+    dispatcher.add_handler(CommandHandler("blacklist_user", blacklist_user))
+    dispatcher.add_handler(CommandHandler("view_users", view_users))
+    dispatcher.add_handler(CommandHandler("cancel_booking", cancel_booking_by_id))
+    dispatcher.add_handler(CommandHandler("admin", manage_users_interaction))
+    
+    # Register CallbackQueryHandler for handling callback queries from inline keyboards
     dispatcher.add_handler(CallbackQueryHandler(button, pattern='^(book_table|date_|table_)'))
-    dispatcher.add_handler(CallbackQueryHandler(display_bookings_for_cancellation, pattern='^cancel_booking$'))
     dispatcher.add_handler(CallbackQueryHandler(cancel_booking, pattern='^cancel_'))
     dispatcher.add_handler(CallbackQueryHandler(view_my_bookings, pattern='^view_my_bookings$'))
     dispatcher.add_handler(CallbackQueryHandler(view_all_bookings, pattern='^view_all_bookings$'))
-    dispatcher.add_handler(CommandHandler("history", view_booking_history))
-    dispatcher.add_handler(CallbackQueryHandler(manage_users_interaction, pattern='^manage_users$'))
-    dispatcher.add_handler(CommandHandler("add_user", add_user))
-    dispatcher.add_handler(CommandHandler("make_admin", make_admin))
-    dispatcher.add_handler(CommandHandler("blacklist_user", blacklist_user))
-    dispatcher.add_handler(CommandHandler("remove_user", remove_user))
-    dispatcher.add_handler(CommandHandler("revoke_admin", revoke_admin))
-    dispatcher.add_handler(CommandHandler("manage_users", manage_users))
-    dispatcher.add_handler(CommandHandler("view_users", view_users))
-    dispatcher.add_handler(CommandHandler("cancel_booking", cancel_booking_by_id))
-    dispatcher.add_handler(CommandHandler("book", start_booking_process)) 
-    dispatcher.add_handler(CommandHandler("cancel", display_bookings_for_cancellation))  # /cancel to trigger display_bookings_for_cancellation
-    dispatcher.add_handler(CommandHandler("my_bookings", view_my_bookings))  # /my_bookings to trigger view_my_bookings
-    dispatcher.add_handler(CommandHandler("all_bookings", view_all_bookings))  # /all_bookings to trigger view_all_bookings
-    # Add other necessary handlers
+    dispatcher.add_handler(CallbackQueryHandler(display_bookings_for_cancellation, pattern='^cancel_booking$'))
 
     # Start the Bot
     updater.start_polling()

@@ -1,2 +1,3 @@
 data/users.db
 data/bookings.db
+config.py

@@ -9,7 +9,7 @@ USERS_DB_PATH = 'data/users.db'
 ADMIN_USER_ID = 'your_admin_user_id'
 ADMIN_USERNAME = 'your_admin_username'
 
-#Logging Time Zone Configuratin
+#Logging Time Zone Configuration
 LOG_TIMEZONE = "timezone"
 
 # Other Configurations

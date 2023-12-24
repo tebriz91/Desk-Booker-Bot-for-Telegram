@@ -14,8 +14,8 @@ admin_user_id = config.ADMIN_USER_ID
 admin_username = config.ADMIN_USERNAME
 bookings_db_path = config.BOOKINGS_DB_PATH
 users_db_path = config.USERS_DB_PATH
-total_tables = config.TOTAL_TABLES
 log_timezone = config.LOG_TIMEZONE
+total_tables = config.TOTAL_TABLES
 
 # Configure Time Zone for logging. This allows you change the logging time zone by updating the LOG_TIMEZONE variable in your config.py file
 class ConfigurableTimeZoneFormatter(logging.Formatter):
@@ -52,8 +52,8 @@ def initialize_databases():
         cursor = conn.cursor()
         cursor.execute('''CREATE TABLE IF NOT EXISTS bookings
                            (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                            user_id TEXT, username TEXT, 
-                            booking_date TEXT, table_id INTEGER)''')
+                            user_id INTEGER, username TEXT, 
+                            booking_date DATE, table_id INTEGER)''')
         conn.commit()
 
 # Initialize the users database
@@ -62,7 +62,7 @@ def initialize_databases():
         cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        user_id TEXT UNIQUE, 
+        user_id INTEGER UNIQUE, 
         username TEXT, 
         is_admin INTEGER DEFAULT 0, 
         is_blacklisted INTEGER DEFAULT 0

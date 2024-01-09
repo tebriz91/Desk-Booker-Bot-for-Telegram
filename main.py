@@ -491,14 +491,25 @@ def view_bookings(update: Update, context: CallbackContext, personal_only=False)
 
         bookings = execute_db_query(bookings_db_path, sql_query, parameters, fetch_all=True)
 
+        # Group bookings by date
+        bookings_by_date = {}
+        for booking in bookings:
+            booking_date = booking[0]
+            table_id = booking[1]
+            username = booking[2] if not personal_only else "You"
+            if booking_date not in bookings_by_date:
+                bookings_by_date[booking_date] = []
+            bookings_by_date[booking_date].append(f"Table: {table_id}" if personal_only else f"Table: {table_id}, User: {username}")
+
         # Format and send the response
         if bookings:
             message_text = "Your Bookings:\n\n" if personal_only else "All Bookings:\n\n"
-            for booking in bookings:
-                message_text += f"Date: {booking[0]}, Table: {booking[1]}"
-                if not personal_only:
-                    message_text += f", User: {booking[2]}"
-                message_text += "\n"
+            for date, bookings_list in bookings_by_date.items():
+                if personal_only:
+                    bookings_str = ', '.join(bookings_list)  # Concatenate all bookings for the same date
+                    message_text += f"{date}, {bookings_str}\n"  # Display date and bookings on the same line
+                else:
+                    message_text += f"{date}\n" + "\n".join(bookings_list) + "\n\n"
         else:
             message_text = "No bookings found."
 

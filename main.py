@@ -459,7 +459,7 @@ def view_bookings(update: Update, context: CallbackContext, personal_only=False)
     try:
         # Define the time range
         today = datetime.now().strftime('%Y-%m-%d')
-        four_days_later = (datetime.now() + timedelta(days=4)).strftime('%Y-%m-%d')
+        next_four_workdays = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d')
 
         # Adjust the query based on whether to show personal or all bookings
         if personal_only:
@@ -474,7 +474,7 @@ def view_bookings(update: Update, context: CallbackContext, personal_only=False)
                          SUBSTR(booking_date, 4, 2) || '-' || 
                          SUBSTR(booking_date, 1, 2), table_id
             """
-            parameters = (user_id, today, four_days_later)
+            parameters = (user_id, today, next_four_workdays)
         else:
             sql_query = """
                 SELECT booking_date, table_id, username
@@ -487,7 +487,7 @@ def view_bookings(update: Update, context: CallbackContext, personal_only=False)
                          SUBSTR(booking_date, 4, 2) || '-' || 
                          SUBSTR(booking_date, 1, 2), table_id
             """
-            parameters = (today, four_days_later)
+            parameters = (today, next_four_workdays)
 
         bookings = execute_db_query(bookings_db_path, sql_query, parameters, fetch_all=True)
 

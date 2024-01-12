@@ -47,7 +47,6 @@ logger.addHandler(handler)
 os.makedirs(os.path.dirname(bookings_db_path), exist_ok=True)
 os.makedirs(os.path.dirname(users_db_path), exist_ok=True)
 
-# Function to initialize databases
 def initialize_databases():
     # Initialize bookings database
     with sqlite3.connect(bookings_db_path) as conn:

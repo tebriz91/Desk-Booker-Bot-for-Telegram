@@ -1,3 +1,4 @@
 data/users.db
 data/bookings.db
+assets
 config.py

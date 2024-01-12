@@ -7,6 +7,7 @@ import logging
 import time
 import pytz
 import os
+import threading
 import config
 
 # Use the configurations
@@ -15,6 +16,8 @@ admin_username = config.ADMIN_USERNAME
 bookings_db_path = config.BOOKINGS_DB_PATH
 users_db_path = config.USERS_DB_PATH
 log_timezone = config.LOG_TIMEZONE
+
+db_lock = threading.Lock() # Global lock object that will be used to control access to the database for write operations
 
 # Configure Time Zone for logging. This allows you change the logging time zone by updating the LOG_TIMEZONE variable in your config.py file
 class ConfigurableTimeZoneFormatter(logging.Formatter):
@@ -56,6 +59,7 @@ def initialize_databases():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 room_name TEXT NOT NULL,
                 is_available INTEGER NOT NULL DEFAULT 1,
+                plan_url TEXT,
                 additional_info TEXT
             )
         ''')
@@ -111,13 +115,16 @@ def initialize_rooms_and_desks():
 
         for room in config.ROOMS:
             room_name = room['name']
-            room_info = room.get('additional_info', None)
+            room_info = room.get('additional_info', "")
             is_available = 1 if room.get('is_available', True) else 0
+            plan_url = room.get('plan_url', "")  # Get the plan_url
 
             if room_name not in existing_rooms:
                 # Insert new room
-                cursor.execute("INSERT INTO rooms (room_name, is_available, additional_info) VALUES (?, ?, ?)", 
-                               (room_name, is_available, room_info))
+                cursor.execute("INSERT INTO rooms (room_name, is_available, plan_url,additional_info) VALUES (?, ?, ?, ?)", 
+                               (room_name, is_available, plan_url, room_info))
+                
+                # Get the newly created room's ID
                 room_id = cursor.lastrowid
 
                 # Insert desks for this room
@@ -135,18 +142,18 @@ def initialize_admin_user():
 
 def execute_db_query(database_path, query, parameters=(), fetch_one=False, fetch_all=False):
     try:
-        with sqlite3.connect(database_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, parameters)
-            if fetch_one:
-                return cursor.fetchone()
-            elif fetch_all:
-                result = cursor.fetchall()
-                logger.info(f"Fetched {len(result)} records: {result}")
-                return result
-            else:
-                conn.commit()
-                return cursor.rowcount  # Return the number of rows affected
+        with db_lock:  # Acquire the lock before connecting to the database
+            with sqlite3.connect(database_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, parameters)
+                if fetch_one:
+                    return cursor.fetchone()
+                elif fetch_all:
+                    result = cursor.fetchall()
+                    return result
+                else:
+                    conn.commit()
+                    return cursor.rowcount  # Return the number of rows affected
     except sqlite3.Error as e:
         logger.error(f"Database error: {e}")
         raise
@@ -417,6 +424,15 @@ def room_selected(update: Update, context: CallbackContext) -> None:
     context.user_data['selected_room_id'] = selected_room_id
     booking_date = context.user_data['selected_date']
 
+    # Get the room name and plan URL
+    room_query = "SELECT room_name, plan_url FROM rooms WHERE id = ?"
+    room_result = execute_db_query(bookings_db_path, room_query, (selected_room_id,), fetch_one=True)
+    room_name = room_result[0] if room_result else "Unknown"
+    plan_url = room_result[1] if room_result and room_result[1] else "https://your-default-image-url.jpg"
+
+    # Edit the current message to include the room plan link
+    text_with_image_link = f"Select a desk to book in {room_name} according to the [room plan]({plan_url}):"
+
     # Retrieve the list of available desks from the database
     desk_query = """
         SELECT desks.id, desk_number, (SELECT COUNT(*) FROM bookings WHERE desk_id = desks.id AND booking_date = ?) as is_booked
@@ -429,7 +445,7 @@ def room_selected(update: Update, context: CallbackContext) -> None:
         keyboard = [[InlineKeyboardButton(f"{'✅' if not is_booked else '🚫'} Desk {desk_number}", callback_data=f'desk_{desk_id}')]
                     for desk_id, desk_number, is_booked in desks]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        update.callback_query.edit_message_text(text="Select a desk to book:", reply_markup=reply_markup)
+        update.callback_query.edit_message_text(text=text_with_image_link, reply_markup=reply_markup, parse_mode='MarkdownV2')
     else:
         update.callback_query.edit_message_text(text="No desks available to book in the selected room.")
 
@@ -509,7 +525,6 @@ def display_bookings_for_cancellation(update: Update, context: CallbackContext) 
 
     try:
         today = datetime.now().strftime('%d.%m.%Y')
-        logger.info(f"Today's date for comparison: {today}")  # Log the today's date
 
         query = """
             SELECT b.id, b.booking_date, d.desk_number
@@ -524,10 +539,10 @@ def display_bookings_for_cancellation(update: Update, context: CallbackContext) 
                 SUBSTR(b.booking_date, 4, 2) || '-' || 
                 SUBSTR(b.booking_date, 1, 2)
         """
-        logger.info(f"Executing query: {query}")  # Log the query
+        # logger.info(f"Executing query: {query}")  # Log the query
 
         bookings = execute_db_query(bookings_db_path, query, (user_id, today), fetch_all=True)
-        logger.info(f"Fetched bookings: {bookings}")  # Log fetched bookings
+        # logger.info(f"Fetched bookings: {bookings}")  # Log fetched bookings
 
         if bookings:
             keyboard = [[InlineKeyboardButton(f"Cancel Desk {desk_number} on {booking_date}", callback_data=f'cancel_{booking_id}')] 
@@ -564,19 +579,21 @@ def view_my_bookings(update: Update, context: CallbackContext) -> None:
     user_id = str(update.effective_user.id)
     username = update.effective_user.username or "Unknown User"
 
+    # Define the time range
+    today = datetime.now().strftime('%d.%m.%Y (%a)')
+    next_four_workdays = (datetime.now() + timedelta(days=7)).strftime('%d.%m.%Y (%a)')
+
     try:
-        # Define the query to fetch the user's bookings
         sql_query = """
             SELECT b.booking_date, r.room_name, d.desk_number
             FROM bookings b
             INNER JOIN desks d ON b.desk_id = d.id
             INNER JOIN rooms r ON d.room_id = r.id
-            WHERE b.user_id = ?
-            ORDER BY SUBSTR(b.booking_date, 7, 4) || '-' || 
-                     SUBSTR(b.booking_date, 4, 2) || '-' || 
-                     SUBSTR(b.booking_date, 1, 2)
+            WHERE b.user_id = ? AND 
+                  SUBSTR(b.booking_date, 1, 16) BETWEEN ? AND ?  -- Adjusted to match the date format with day
+            ORDER BY b.booking_date
         """
-        bookings = execute_db_query(bookings_db_path, sql_query, (user_id,), fetch_all=True)
+        bookings = execute_db_query(bookings_db_path, sql_query, (user_id, today, next_four_workdays), fetch_all=True)
 
         if bookings:
             message_text = f"Your bookings, @{username}:\n\n"
@@ -592,21 +609,21 @@ def view_my_bookings(update: Update, context: CallbackContext) -> None:
 
 @user_required
 def view_all_bookings(update: Update, context: CallbackContext) -> None:
+    # Define the time range
+    today = datetime.now().strftime('%d.%m.%Y (%a)')
+    next_four_workdays = (datetime.now() + timedelta(days=7)).strftime('%d.%m.%Y (%a)')
+
     try:
-        # Query to get bookings
         bookings_query = """
             SELECT b.booking_date, r.room_name, d.desk_number, b.user_id
             FROM bookings b
             INNER JOIN desks d ON b.desk_id = d.id
             INNER JOIN rooms r ON d.room_id = r.id
-            ORDER BY SUBSTR(b.booking_date, 7, 4) || '-' || 
-                     SUBSTR(b.booking_date, 4, 2) || '-' || 
-                     SUBSTR(b.booking_date, 1, 2), 
-                     r.room_name, d.desk_number
+            WHERE SUBSTR(b.booking_date, 1, 16) BETWEEN ? AND ?  -- Adjusted to match the date format with day
+            ORDER BY SUBSTR(b.booking_date, 1, 16), r.room_name, d.desk_number
         """
-        bookings = execute_db_query(bookings_db_path, bookings_query, fetch_all=True)
+        bookings = execute_db_query(bookings_db_path, bookings_query, (today, next_four_workdays), fetch_all=True)
 
-        # Query to get user names
         users_query = "SELECT user_id, username FROM users"
         users = execute_db_query(users_db_path, users_query, fetch_all=True)
         user_dict = {user[0]: user[1] for user in users}
@@ -621,12 +638,20 @@ def view_all_bookings(update: Update, context: CallbackContext) -> None:
                 organized_bookings[date_room_key].append(f"Desk {desk_number}, @{user_name}")
 
             message_text = "All bookings:\n\n"
-            current_date = ""
+            last_date = None
             for (booking_date, room_name), desks in organized_bookings.items():
-                if current_date != booking_date:
-                    current_date = booking_date
-                    message_text += f"*{booking_date}*:\n\n"  # Bold the date
-                message_text += f"{room_name}:\n" + "\n".join(desks) + "\n\n"
+                if last_date != booking_date:
+                    if last_date is not None:
+                        message_text += "\n"  # Add extra newline for separation between dates
+                    message_text += f"*{booking_date}*:\n\n"
+                    last_date = booking_date
+                    first_room = True
+                else:
+                    first_room = False
+
+                if not first_room:
+                    message_text += "\n"  # Separate different rooms on the same date
+                message_text += f"{room_name}:\n" + "\n".join(desks) + "\n"
         else:
             message_text = "There are no bookings."
 
@@ -640,34 +665,49 @@ def view_booking_history(update: Update, context: CallbackContext) -> None:
     two_weeks_ago = (datetime.now() - timedelta(days=14)).strftime('%Y-%m-%d')
 
     try:
-        sql_query = """
-            SELECT id, booking_date, table_id, username
-            FROM bookings 
+        # Fetch users from users_db_path
+        users_query = "SELECT user_id, username FROM users"
+        users = execute_db_query(users_db_path, users_query, fetch_all=True)
+        user_dict = {user[0]: user[1] for user in users}
+
+        # Fetch bookings from bookings_db_path
+        bookings_query = """
+            SELECT b.id, b.booking_date, r.room_name, d.desk_number, b.user_id
+            FROM bookings b
+            JOIN desks d ON b.desk_id = d.id
+            JOIN rooms r ON d.room_id = r.id
             WHERE 
-                SUBSTR(booking_date, 7, 4) || '-' || 
-                SUBSTR(booking_date, 4, 2) || '-' || 
-                SUBSTR(booking_date, 1, 2) >= ?
+                SUBSTR(b.booking_date, 7, 4) || '-' || 
+                SUBSTR(b.booking_date, 4, 2) || '-' || 
+                SUBSTR(b.booking_date, 1, 2) >= ?
             ORDER BY 
-                SUBSTR(booking_date, 7, 4) || '-' || 
-                SUBSTR(booking_date, 4, 2) || '-' || 
-                SUBSTR(booking_date, 1, 2), table_id
+                SUBSTR(b.booking_date, 7, 4) || '-' || 
+                SUBSTR(b.booking_date, 4, 2) || '-' || 
+                SUBSTR(b.booking_date, 1, 2), r.room_name, d.desk_number
         """
-        bookings = execute_db_query(bookings_db_path, sql_query, (two_weeks_ago,), fetch_all=True)
+        bookings = execute_db_query(bookings_db_path, bookings_query, (two_weeks_ago,), fetch_all=True)
 
+        message_text = "Booking history for the past two weeks:\n\n"
+        last_date_room = None
         if bookings:
-            bookings_by_date = {}
-            for booking_id, booking_date, table_id, username in bookings:
-                if booking_date not in bookings_by_date:
-                    bookings_by_date[booking_date] = []
-                bookings_by_date[booking_date].append(f"Table: {table_id}, User: {username}, ID: {booking_id}")
+            for booking_id, booking_date, room_name, desk_number, user_id in bookings:
+                user_name = user_dict.get(user_id, "Unknown User")
+                date_room_key = (booking_date, room_name)
 
-            message_text = "Booking history for the past two weeks:\n\n"
-            for date, bookings_list in bookings_by_date.items():
-                message_text += f"{date}\n" + "\n".join(bookings_list) + "\n\n"
+                # Check if we are still listing bookings for the same room on the same date
+                if date_room_key != last_date_room:
+                    if last_date_room is not None and last_date_room[0] != booking_date:
+                        message_text += "\n"  # Add extra newline for separation between dates
+                    elif last_date_room is not None:
+                        message_text += "\n"  # Extra newline for separation between rooms on the same date
+                    message_text += f"*{booking_date}*:\n\n{room_name}:\n"  # Date and room header
+                    last_date_room = date_room_key
+
+                message_text += f"Desk {desk_number}, @{user_name}, booking id: {booking_id}\n"
         else:
             message_text = "No bookings in the past two weeks."
 
-        update.message.reply_text(message_text)
+        update.message.reply_text(message_text, parse_mode='Markdown')
         logger.info(f"Admin {update.effective_user.id} viewed booking history.")
     except Exception as e:
         logger.error(f"Error viewing booking history by Admin {update.effective_user.id}: {e}")

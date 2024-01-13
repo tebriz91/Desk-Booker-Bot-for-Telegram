@@ -323,6 +323,33 @@ def cancel_booking_by_id(update: Update, context: CallbackContext) -> None:
         logger.error(f"Error cancelling booking with ID {booking_id} by Admin {update.effective_user.id}: {e}")
         update.message.reply_text("Failed to cancel the booking. Please try again later.")
 
+@admin_required
+def view_rooms(update: Update, context: CallbackContext) -> None:
+    """Fetches and displays room and desk data from the database."""
+    try:
+        # Fetch room data
+        rooms_query = "SELECT id, room_name, is_available, additional_info, plan_url FROM rooms"
+        rooms = execute_db_query(bookings_db_path, rooms_query, fetch_all=True)
+
+        message_text = "Rooms and Desks Information:\n\n"
+        for room_id, room_name, is_available, additional_info, plan_url in rooms:
+            # Fetch desk data for each room
+            desks_query = "SELECT id, desk_number, is_available, additional_info FROM desks WHERE room_id = ?"
+            desks = execute_db_query(bookings_db_path, desks_query, (room_id,), fetch_all=True)
+
+            # Format room data
+            message_text += f"room_name: {room_name}, room_id: {room_id}, is_available: {is_available}, add_info: {additional_info}, plan_url: {plan_url}\n"
+
+            # Format desk data
+            for desk_id, desk_number, desk_available, desk_info in desks:
+                message_text += f"desk_number: {desk_number}, desk_id: {desk_id}, is_available: {desk_available}, add_info: {desk_info}\n"
+            message_text += "\n"
+
+        update.message.reply_text(message_text)
+    except Exception as e:
+        logger.error(f"Error in view_rooms: {e}")
+        update.message.reply_text("An error occurred while retrieving room and desk information. Please try again later.")
+
 def generate_dates():
     dates = []
     current_date = datetime.now()
@@ -736,6 +763,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler("blacklist_user", blacklist_user))
     dispatcher.add_handler(CommandHandler("view_users", view_users))
     dispatcher.add_handler(CommandHandler("cancel_booking", cancel_booking_by_id))
+    dispatcher.add_handler(CommandHandler("view_rooms", view_rooms))
     dispatcher.add_handler(CommandHandler("admin", manage_users))
     
     # Register CallbackQueryHandler for handling callback queries from inline keyboards

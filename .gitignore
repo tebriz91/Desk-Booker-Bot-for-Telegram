@@ -2,3 +2,5 @@ data/users.db
 data/bookings.db
 assets
 config.py
+rooms_config.py
+```

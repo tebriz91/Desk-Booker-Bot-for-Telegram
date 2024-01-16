@@ -3,4 +3,5 @@ data/bookings.db
 assets
 config.py
 rooms_config.py
+Modules.txt
 ```

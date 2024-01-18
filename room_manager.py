@@ -50,10 +50,10 @@ def add_desk(update: Update, context: CallbackContext) -> None:
     # Insert new desk into database
     try:
         execute_db_query("INSERT INTO desks (room_id, desk_number) VALUES (?, ?)", (room_id, desk_number))
-        update.message.reply_text(f"Desk {desk_number} added successfully to room {room_id}.")
-        logger.info(f"Desk {desk_number} added successfully to room {room_id} by Admin {update.effective_user.id}")
+        update.message.reply_text(f"Desk {desk_number} added successfully to room (room_id: {room_id}).")
+        logger.info(f"Desk {desk_number} added successfully to room (room_id: {room_id}) by Admin {update.effective_user.id}")
     except Exception as e:
-        logger.error(f"Error adding desk {desk_number} to room {room_id}: {e}")
+        logger.error(f"Error adding desk {desk_number} to room (room_id: {room_id}): {e}")
         update.message.reply_text("Failed to add desk. Please try again later.")
 
 @admin_required
@@ -244,15 +244,16 @@ def view_rooms(update: Update, context: CallbackContext) -> None:
         for room in rooms:
 
             room_id, room_name, room_availability, room_add_info, plan_url = room
-            message_text += f"Room Name: {room_name}, Room ID: {room_id}, Availability: {room_availability}, Additional Info: {room_add_info}, Plan URL: {plan_url}\n"
-
+            message_text += f"room_name: {room_name}\nroom_id: {room_id}, room_availability: {room_availability}, room_add_info: {room_add_info}, plan_url: {plan_url}\n\n"
+            
             # Get desks for the room
             desks = execute_db_query("SELECT desk_id, desk_number, desk_availability, desk_add_info FROM desks WHERE room_id = ?", (room_id,), fetch_all=True)
 
             # Iterate through desks and append to message_text
             for desk in desks:
                 desk_id, desk_number, desk_availability, desk_add_info = desk
-                message_text += f"\tDesk Number: {desk_number}, Desk ID: {desk_id}, Availability: {desk_availability}, Additional Info: {desk_add_info}\n"
+                message_text += f"desk_number: {desk_number}, desk_id: {desk_id}, desk_availability: {desk_availability}, desk_add_info: {desk_add_info}\n"
+            message_text += "\n"
 
         update.message.reply_text(message_text)
     except Exception as e:

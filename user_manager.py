@@ -31,7 +31,7 @@ def start_command(update: Update, context: CallbackContext):
         return
 
     # Logic for preventing frequent /start command usage
-    timeout = 300  # Timeout in seconds
+    timeout = 15  # Timeout in seconds
     last_time = last_start_command.get(user_id, None)
 
     if last_time and (current_time - last_time).total_seconds() < timeout:
@@ -154,7 +154,7 @@ def make_admin(update: Update, context: CallbackContext):
     try:
         execute_db_query("UPDATE users SET is_admin = 1 WHERE user_id = ?", (user_id_to_admin,))
         update.message.reply_text("User updated to admin successfully.")
-        logger.info(f"User with ID {user_id_to_admin} made an admin successfully by Admin {update.effective_user.id}")
+        logger.info(f"User (user_id: {user_id_to_admin}) made an admin successfully by Admin {update.effective_user.id}")
     except Exception as e:
         logger.error(f"Error making user with ID {user_id_to_admin} an admin: {e}")
         update.message.reply_text("Failed to update user to admin. Please try again later.")

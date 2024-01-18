@@ -1,19 +1,20 @@
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
+
 import config
+
 from db_initializer import initialize_database, initialize_admin_user
 
 from user_manager import start_command, add_user, remove_user, make_admin, revoke_admin, delist_user, list_user, view_users
 
 from room_manager import add_room, add_desk, edit_room_name, edit_plan_url, edit_desk_number, remove_room, remove_desk, set_room_availability, set_desk_availability, view_rooms
 
-from booking_manager import start_booking_process, date_selected, room_selected, desk_selected, cancel_button, cancel_booking, display_bookings_for_cancellation, view_my_bookings, view_all_bookings, view_booking_history
+from booking_manager import start_booking_process, date_selected, room_selected, desk_selected, cancel_button, cancel_booking, display_bookings_for_cancellation, cancel_booking_by_id, view_my_bookings, view_all_bookings, view_booking_history
 
-from utilities import admin_commands, help_command  # Import admin_commands and help_command
+from utilities import admin_commands, help_command 
 
 def main():
-    initialize_database()  # Ensure database is initialized
-    initialize_admin_user()  # Ensure admin user is added
-    # Initialize user_manager, room_manager, booking_manager
+    initialize_database()
+    initialize_admin_user()
 
     updater = Updater(config.BOT_TOKEN, use_context=True)
     
@@ -39,6 +40,7 @@ def main():
     dispatcher.add_handler(CommandHandler('view_rooms', view_rooms))
     dispatcher.add_handler(CommandHandler('book', start_booking_process))
     dispatcher.add_handler(CommandHandler("cancel", display_bookings_for_cancellation))
+    dispatcher.add_handler(CommandHandler("cancel_booking", cancel_booking_by_id))
     dispatcher.add_handler(CommandHandler("my_bookings", view_my_bookings))
     dispatcher.add_handler(CommandHandler("all_bookings", view_all_bookings))
     dispatcher.add_handler(CommandHandler("history", view_booking_history))

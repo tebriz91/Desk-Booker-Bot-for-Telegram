@@ -154,8 +154,6 @@ def room_selected(update: Update, context: CallbackContext) -> None:
 
         room_name, plan_url = room_result # Unpack the tuple into variables for convenience (room_name, plan_url)
 
-        plan_url = plan_url if plan_url else "https://your-default-image-url.jpg" # Replace with your default image URL
-
         text_with_image_link = f"Select a desk in {room_name} according to the [room plan]({plan_url}):" # MarkdownV2 format
 
         desks = execute_db_query("""
@@ -200,8 +198,6 @@ def desk_selected(update: Update, context: CallbackContext) -> None:
 
     # Check if the desk is available
     try:
-        query.edit_message_text(response_text)
-
         if check_desk_availability(selected_desk_id, booking_date):
             # Desk is available, proceed with booking
             user_id = update.effective_user.id
@@ -213,6 +209,9 @@ def desk_selected(update: Update, context: CallbackContext) -> None:
         else:
             # Desk is not available
             response_text = f"Desk {desk_number} is not available on {booking_date}. Please choose another desk."
+
+        query.edit_message_text(response_text)
+
     except Exception as e:
         logger.error(f"Error in desk_selected: {e}")
         response_text = "An error occurred. Please try again."
@@ -232,8 +231,10 @@ def check_desk_availability(desk_id, booking_date):
 @user_required
 def display_bookings_for_cancellation(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
+
+    today = datetime.now().strftime('%d.%m.%Y (%a)') # format the date as 'DD.MM.YYYY (Day)' (as stored in the database)
+
     try:
-        today = datetime.now().strftime('%Y-%m-%d')
         bookings = execute_db_query("""
             SELECT b.booking_id, b.booking_date, d.desk_number
             FROM bookings b
@@ -241,20 +242,6 @@ def display_bookings_for_cancellation(update: Update, context: CallbackContext) 
             WHERE b.user_id = ? AND b.booking_date >= ?
             ORDER BY b.booking_date
         """, (user_id, today), fetch_all=True)
-
-        # OLD QUERY
-        # """
-        #         SELECT b.booking_id, SUBSTR(b.booking_date, 1, 10) as formatted_date, d.desk_number
-        #         FROM bookings b
-        #         JOIN desks d ON b.desk_id = d.desk_id
-        #         WHERE b.user_id = ? AND
-        #             strftime('%Y-%m-%d', SUBSTR(b.booking_date, 7, 4) || '-' || 
-        #             SUBSTR(b.booking_date, 4, 2) || '-' || 
-        #             SUBSTR(b.booking_date, 1, 2)) >= strftime('%Y-%m-%d', ?)
-        #         ORDER BY strftime('%Y-%m-%d', SUBSTR(b.booking_date, 7, 4) || '-' || 
-        #                 SUBSTR(b.booking_date, 4, 2) || '-' || 
-        #                 SUBSTR(b.booking_date, 1, 2))
-        #     """
 
         if bookings:
             
@@ -306,6 +293,7 @@ def cancel_booking_by_id(update: Update, context: CallbackContext) -> None:
     try:
         execute_db_query("DELETE FROM bookings WHERE booking_id = ?", (booking_id,))
         update.message.reply_text(f"Booking (booking_id: {booking_id}) cancelled successfully.")
+        logger.info(f"Admin {update.effective_user.id} cancelled booking (booking_id: {booking_id}).")
     except Exception as e:
         logger.error(f"Error cancelling booking (booking_id: {booking_id}): {e}")
         update.message.reply_text("Failed to cancel the booking. Please try again later.")

@@ -1,26 +1,21 @@
 import sqlite3
 import os
-import threading
-
 import config
-import rooms_config
-import logging_setup
+from logger import Logger
+from db_queries import execute_db_query
 
-db_path = config.DB_PATH
-admin_user_id = config.ADMIN_USER_ID
-admin_username = config.ADMIN_USERNAME
-logger = logging_setup.logger
-
-# Ensure the 'data' directory for databases exists
-os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
-db_lock = threading.Lock() # Global lock object that will be used to control access to the database for write operations
+# Logger instance
+logger = Logger.get_logger(__name__)
 
 def initialize_database():
+    db_path = config.DB_PATH
+    # Ensure the 'data' directory for databases exists
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    
     # Initialize database
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
-
+        
         # Create Rooms table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS rooms (
@@ -70,26 +65,9 @@ def initialize_database():
         conn.commit()
 
 def initialize_admin_user():
+    admin_user_id = config.ADMIN_USER_ID
+    admin_username = config.ADMIN_USERNAME
     admin_user_exists = execute_db_query("SELECT user_id FROM users WHERE user_id = ?", (admin_user_id,), fetch_one=True)
     if not admin_user_exists:
         execute_db_query("INSERT INTO users (user_id, username, is_admin) VALUES (?, ?, 1)", (admin_user_id, admin_username))
         logger.info(f"Admin user {admin_username} added to the database.")
-
-# Updated execute_db_query function
-def execute_db_query(query, parameters=(), fetch_one=False, fetch_all=False):
-    try:
-        with db_lock:
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute(query, parameters)
-                if fetch_one:
-                    return cursor.fetchone()
-                elif fetch_all:
-                    return cursor.fetchall()
-                else:
-                    conn.commit()
-    except sqlite3.Error as e:
-        logger.error(f"Database error: {e}")
-        raise
-    result = cursor.fetchall()
-    return result or []

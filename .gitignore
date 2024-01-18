@@ -1,7 +1,5 @@
-data/users.db
-data/bookings.db
+data
 assets
 config.py
 rooms_config.py
-Modules.txt
 ```

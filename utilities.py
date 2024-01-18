@@ -1,7 +1,11 @@
 from telegram import Update
 from telegram.ext import CallbackContext
 import config
+from logger import Logger
 from decorators import admin_required, user_required
+from db_operations import create_database_dump, clean_up_dump_file
+
+logger = Logger.get_logger(__name__)
 
 @admin_required
 def admin_commands(update: Update, context: CallbackContext) -> None:
@@ -24,6 +28,7 @@ def admin_commands(update: Update, context: CallbackContext) -> None:
     message_text += "/edit_room_name [room_id] [new_room_name] - Edit a room name\n"
     message_text += "/edit_plan_url [room_id] [new_plan_url] - Edit a room plan URL\n"
     message_text += "/edit_desk_number [desk_id] [new_desk_number] - Edit a desk number\n"
+    message_text += "/dump_db - Create and send a database dump\n"
     
     update.message.reply_text(message_text)
 
@@ -31,3 +36,22 @@ def admin_commands(update: Update, context: CallbackContext) -> None:
 def help_command(update: Update, context: CallbackContext) -> None:
     message_text = (f"Contact @{config.ADMIN_USERNAME} if you need help.")
     update.message.reply_text(message_text)
+
+@admin_required
+def dump_database(update, context):
+    if update.message.from_user.id != int(config.ADMIN_USER_ID):
+        update.message.reply_text("You are not authorized to use this command.")
+        return
+
+    try:
+        dump_file = create_database_dump(config.DB_PATH, 'database_dump.sql')
+        if dump_file:
+            with open(dump_file, 'rb') as f:
+                context.bot.send_document(chat_id=update.effective_chat.id, document=f)
+            clean_up_dump_file(dump_file)
+            logger.info("Database dump sent successfully")
+        else:
+            update.message.reply_text("Failed to create database dump.")
+    except Exception as e:
+        update.message.reply_text("Failed to create database dump.")
+        logger.error(f"Error in dump_database command: {e}")

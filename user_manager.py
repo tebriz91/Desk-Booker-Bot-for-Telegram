@@ -31,7 +31,7 @@ def start_command(update: Update, context: CallbackContext):
         return
 
     # Logic for preventing frequent /start command usage
-    timeout = 15  # Timeout in seconds
+    timeout = config.START_COMMAND_TIMEOUT  # Timeout in seconds
     last_time = last_start_command.get(user_id, None)
 
     if last_time and (current_time - last_time).total_seconds() < timeout:

@@ -13,7 +13,7 @@ from room_manager import add_room, add_desk, edit_room_name, edit_plan_url, edit
 
 from booking_manager import start_booking_process, date_selected, room_selected, desk_selected, cancel_button, cancel_booking, display_bookings_for_cancellation, cancel_booking_by_id, view_my_bookings, view_all_bookings, view_booking_history
 
-from utilities import admin_commands, help_command 
+from utilities import admin_commands, help_command, dump_database
 
 def main():
     initialize_database()
@@ -49,6 +49,7 @@ def main():
     dispatcher.add_handler(CommandHandler("history", view_booking_history))
     dispatcher.add_handler(CommandHandler('admin', admin_commands))
     dispatcher.add_handler(CommandHandler('help', help_command))
+    dispatcher.add_handler(CommandHandler('dump_db', dump_database))
 
     # Register CallbackQueryHandler for handling button presses
     dispatcher.add_handler(CallbackQueryHandler(date_selected, pattern='^date_'))

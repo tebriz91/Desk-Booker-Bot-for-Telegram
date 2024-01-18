@@ -17,3 +17,5 @@ LOG_TIMEZONE = os.getenv('LOG_TIMEZONE', 'default_timezone')
 NUM_DAYS = int(os.getenv('NUM_DAYS', '5'))
 EXCLUDE_WEEKENDS = os.getenv('EXCLUDE_WEEKENDS', 'True') == 'True'
 COUNTRY_CODE = os.getenv('COUNTRY_CODE')  # Defaults to None if not set
+
+START_COMMAND_TIMEOUT = int(os.getenv('START_COMMAND_TIMEOUT', '30')) # Timeout for the /start command in seconds

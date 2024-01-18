@@ -1,5 +1,5 @@
+.env
 data
 assets
-config.py
 rooms_config.py
 ```

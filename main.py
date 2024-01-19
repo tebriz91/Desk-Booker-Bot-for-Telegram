@@ -1,7 +1,9 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
+import asyncio
+
+from telegram.ext import CommandHandler, CallbackQueryHandler, ApplicationBuilder
 
 import config
 
@@ -16,53 +18,58 @@ from booking_manager import start_booking_process, date_selected, room_selected,
 from utilities import admin_commands, help_command, dump_database
 
 def main():
-    initialize_database()
-    initialize_admin_user()
+    # Create a new event loop and set it as the current one
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
-    updater = Updater(config.BOT_TOKEN, use_context=True)
+    # Asynchronously initialize the database and admin user
+    loop.create_task(initialize_database())
+    loop.create_task(initialize_admin_user())
+
+    # Create an instance of Application
+    application = ApplicationBuilder().token(config.BOT_TOKEN).build()
     
     # Register handlers
-    dispatcher = updater.dispatcher
-    dispatcher.add_handler(CommandHandler('start', start_command))
-    dispatcher.add_handler(CommandHandler('add_user', add_user))
-    dispatcher.add_handler(CommandHandler('remove_user', remove_user))
-    dispatcher.add_handler(CommandHandler('make_admin', make_admin))
-    dispatcher.add_handler(CommandHandler('revoke_admin', revoke_admin))
-    dispatcher.add_handler(CommandHandler('delist_user', delist_user))
-    dispatcher.add_handler(CommandHandler('list_user', list_user))
-    dispatcher.add_handler(CommandHandler('view_users', view_users))
-    dispatcher.add_handler(CommandHandler('add_room', add_room))
-    dispatcher.add_handler(CommandHandler('add_desk', add_desk))
-    dispatcher.add_handler(CommandHandler('edit_room_name', edit_room_name))
-    dispatcher.add_handler(CommandHandler('edit_plan_url', edit_plan_url))
-    dispatcher.add_handler(CommandHandler('edit_desk_number', edit_desk_number))
-    dispatcher.add_handler(CommandHandler('set_room_availability', set_room_availability))
-    dispatcher.add_handler(CommandHandler('set_desk_availability', set_desk_availability))
-    dispatcher.add_handler(CommandHandler('remove_room', remove_room))
-    dispatcher.add_handler(CommandHandler('remove_desk', remove_desk))
-    dispatcher.add_handler(CommandHandler('view_rooms', view_rooms))
-    dispatcher.add_handler(CommandHandler('book', start_booking_process))
-    dispatcher.add_handler(CommandHandler("cancel", display_bookings_for_cancellation))
-    dispatcher.add_handler(CommandHandler("cancel_booking", cancel_booking_by_id))
-    dispatcher.add_handler(CommandHandler("my_bookings", view_my_bookings))
-    dispatcher.add_handler(CommandHandler("all_bookings", view_all_bookings))
-    dispatcher.add_handler(CommandHandler("history", view_booking_history))
-    dispatcher.add_handler(CommandHandler('admin', admin_commands))
-    dispatcher.add_handler(CommandHandler('help', help_command))
-    dispatcher.add_handler(CommandHandler('dump_db', dump_database))
+    application.add_handler(CommandHandler('start', start_command))
+    application.add_handler(CommandHandler('start', start_command))
+    application.add_handler(CommandHandler('add_user', add_user))
+    application.add_handler(CommandHandler('remove_user', remove_user))
+    application.add_handler(CommandHandler('make_admin', make_admin))
+    application.add_handler(CommandHandler('revoke_admin', revoke_admin))
+    application.add_handler(CommandHandler('delist_user', delist_user))
+    application.add_handler(CommandHandler('list_user', list_user))
+    application.add_handler(CommandHandler('view_users', view_users))
+    application.add_handler(CommandHandler('add_room', add_room))
+    application.add_handler(CommandHandler('add_desk', add_desk))
+    application.add_handler(CommandHandler('edit_room_name', edit_room_name))
+    application.add_handler(CommandHandler('edit_plan_url', edit_plan_url))
+    application.add_handler(CommandHandler('edit_desk_number', edit_desk_number))
+    application.add_handler(CommandHandler('set_room_availability', set_room_availability))
+    application.add_handler(CommandHandler('set_desk_availability', set_desk_availability))
+    application.add_handler(CommandHandler('remove_room', remove_room))
+    application.add_handler(CommandHandler('remove_desk', remove_desk))
+    application.add_handler(CommandHandler('view_rooms', view_rooms))
+    application.add_handler(CommandHandler('book', start_booking_process))
+    application.add_handler(CommandHandler("cancel", display_bookings_for_cancellation))
+    application.add_handler(CommandHandler("cancel_booking", cancel_booking_by_id))
+    application.add_handler(CommandHandler("my_bookings", view_my_bookings))
+    application.add_handler(CommandHandler("all_bookings", view_all_bookings))
+    application.add_handler(CommandHandler("history", view_booking_history))
+    application.add_handler(CommandHandler('admin', admin_commands))
+    application.add_handler(CommandHandler('help', help_command))
+    application.add_handler(CommandHandler('dump_db', dump_database))
 
     # Register CallbackQueryHandler for handling button presses
-    dispatcher.add_handler(CallbackQueryHandler(date_selected, pattern='^date_'))
-    dispatcher.add_handler(CallbackQueryHandler(room_selected, pattern='^room_'))
-    dispatcher.add_handler(CallbackQueryHandler(desk_selected, pattern='^desk_'))
-    dispatcher.add_handler(CallbackQueryHandler(cancel_button, pattern='^cancelbutton'))
-    dispatcher.add_handler(CallbackQueryHandler(cancel_booking, pattern='^cancel_'))
-    dispatcher.add_handler(CallbackQueryHandler(display_bookings_for_cancellation, pattern='^cancel_booking$'))
-    dispatcher.add_handler(CallbackQueryHandler(start_command, pattern='^add_user '))
+    application.add_handler(CallbackQueryHandler(date_selected, pattern='^date_'))
+    application.add_handler(CallbackQueryHandler(room_selected, pattern='^room_'))
+    application.add_handler(CallbackQueryHandler(desk_selected, pattern='^desk_'))
+    application.add_handler(CallbackQueryHandler(cancel_button, pattern='^cancelbutton'))
+    application.add_handler(CallbackQueryHandler(cancel_booking, pattern='^cancel_'))
+    application.add_handler(CallbackQueryHandler(display_bookings_for_cancellation, pattern='^cancel_booking$'))
+    application.add_handler(CallbackQueryHandler(start_command, pattern='^add_user '))
 
     # Start the bot
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == '__main__':
     main()

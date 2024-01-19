@@ -1,31 +1,31 @@
-import sqlite3
-import threading
+import aiosqlite
+import asyncio
 import config
 from logger import Logger
 
 # Global lock for database operations
-db_lock = threading.Lock()
+db_lock = asyncio.Lock()
 
 # Logger instance
 logger = Logger.get_logger(__name__)
 
-def execute_db_query(query, parameters=(), fetch_one=False, fetch_all=False):
+async def execute_db_query(query, parameters=(), fetch_one=False, fetch_all=False):
     db_path = config.DB_PATH
     try:
-        with db_lock:
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute(query, parameters)
+        async with db_lock:
+            async with aiosqlite.connect(db_path) as conn:
+                cursor = await conn.cursor()
+                await cursor.execute(query, parameters)
                 if fetch_one:
-                    return cursor.fetchone()
+                    return await cursor.fetchone()
                 elif fetch_all:
-                    return cursor.fetchall()
+                    return await cursor.fetchall()
                 else:
-                    conn.commit()
-    except sqlite3.Error as e:
+                    await conn.commit()
+    except aiosqlite.Error as e:
         logger.error(f"Database error: {e}")
         raise
-    return cursor.fetchall() if not (fetch_one or fetch_all) else None
+    return None # return None if fetch_one or fetch_all is not True
 
 # Usage in other modules:
 # from db_queries import execute_db_query

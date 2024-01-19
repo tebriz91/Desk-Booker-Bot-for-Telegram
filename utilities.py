@@ -8,7 +8,7 @@ from db_operations import create_database_dump, clean_up_dump_file
 logger = Logger.get_logger(__name__)
 
 @admin_required
-def admin_commands(update: Update, context: CallbackContext) -> None:
+async def admin_commands(update: Update, context: CallbackContext) -> None:
     message_text = "Admin User Management:\n\n"
     message_text += "/add_user [user_id] [username] - Add a new user\n"
     message_text += "/make_admin [user_id] - Make a user an admin\n"
@@ -30,28 +30,24 @@ def admin_commands(update: Update, context: CallbackContext) -> None:
     message_text += "/edit_desk_number [desk_id] [new_desk_number] - Edit a desk number\n"
     message_text += "/dump_db - Create and send a database dump\n"
     
-    update.message.reply_text(message_text)
+    await update.message.reply_text(message_text)
 
 @user_required
-def help_command(update: Update, context: CallbackContext) -> None:
+async def help_command(update: Update, context: CallbackContext) -> None:
     message_text = (f"Contact @{config.ADMIN_USERNAME} if you need help.")
-    update.message.reply_text(message_text)
+    await update.message.reply_text(message_text)
 
 @admin_required
-def dump_database(update, context):
-    if update.message.from_user.id != int(config.ADMIN_USER_ID):
-        update.message.reply_text("You are not authorized to use this command.")
-        return
-
+async def dump_database(update, context):
     try:
         dump_file = create_database_dump(config.DB_PATH, 'database_dump.sql')
         if dump_file:
             with open(dump_file, 'rb') as f:
-                context.bot.send_document(chat_id=update.effective_chat.id, document=f)
+                await context.bot.send_document(chat_id=update.effective_chat.id, document=f)
             clean_up_dump_file(dump_file)
             logger.info("Database dump sent successfully")
         else:
-            update.message.reply_text("Failed to create database dump.")
+            await update.message.reply_text("Failed to create database dump.")
     except Exception as e:
-        update.message.reply_text("Failed to create database dump.")
+        await update.message.reply_text("Failed to create database dump.")
         logger.error(f"Error in dump_database command: {e}")

@@ -1,4 +1,5 @@
-import sqlite3
+import aiosqlite
+import asyncio
 import os
 import config
 from logger import Logger
@@ -7,17 +8,17 @@ from db_queries import execute_db_query
 # Logger instance
 logger = Logger.get_logger(__name__)
 
-def initialize_database():
+async def initialize_database():
     db_path = config.DB_PATH
     # Ensure the 'data' directory for databases exists
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
     # Initialize database
-    with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
+    async with aiosqlite.connect(db_path) as conn:
+        cursor = await conn.cursor()
         
         # Create Rooms table
-        cursor.execute('''
+        await cursor.execute('''
             CREATE TABLE IF NOT EXISTS rooms (
                 room_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 room_name TEXT NOT NULL,
@@ -28,7 +29,7 @@ def initialize_database():
         ''')
 
         # Create Desks table
-        cursor.execute('''
+        await cursor.execute('''
             CREATE TABLE IF NOT EXISTS desks (
                 desk_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 room_id INTEGER NOT NULL,
@@ -40,7 +41,7 @@ def initialize_database():
         ''')
 
         # Create Users table
-        cursor.execute('''
+        await cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER UNIQUE,
                 username TEXT NOT NULL,
@@ -51,7 +52,7 @@ def initialize_database():
         ''')
 
         # Create Bookings table
-        cursor.execute('''
+        await cursor.execute('''
             CREATE TABLE IF NOT EXISTS bookings (
                 booking_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -62,12 +63,12 @@ def initialize_database():
             )
         ''')
 
-        conn.commit()
+        await conn.commit()
 
-def initialize_admin_user():
+async def initialize_admin_user():
     admin_user_id = config.ADMIN_USER_ID
     admin_username = config.ADMIN_USERNAME
-    admin_user_exists = execute_db_query("SELECT user_id FROM users WHERE user_id = ?", (admin_user_id,), fetch_one=True)
+    admin_user_exists = await execute_db_query("SELECT user_id FROM users WHERE user_id = ?", (admin_user_id,), fetch_one=True)
     if not admin_user_exists:
-        execute_db_query("INSERT INTO users (user_id, username, is_admin) VALUES (?, ?, 1)", (admin_user_id, admin_username))
+        await execute_db_query("INSERT INTO users (user_id, username, is_admin) VALUES (?, ?, 1)", (admin_user_id, admin_username))
         logger.info(f"Admin user {admin_username} added to the database.")

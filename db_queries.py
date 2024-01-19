@@ -29,4 +29,4 @@ async def execute_db_query(query, parameters=(), fetch_one=False, fetch_all=Fals
 
 # Usage in other modules:
 # from db_queries import execute_db_query
-# execute_db_query("SELECT * FROM rooms")
+# await execute_db_query("SELECT * FROM)

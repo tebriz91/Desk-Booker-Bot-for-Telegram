@@ -1,7 +1,5 @@
-import sqlite3
 import os
 import subprocess
-import config
 from logger import Logger
 
 # Logger instance

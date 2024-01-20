@@ -22,6 +22,29 @@ async def is_admin(user_id):
 
         return False # Default to non-admin in case of an error
 
+def superadmin_required(func):
+    async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
+        try:
+            user_id = str(update.effective_user.id)
+
+            logger.info(f"Superadmin command '{func.__name__}' invoked by {user_id}")
+
+            if user_id != config.ADMIN_USER_ID:
+
+                logger.info(f"Unauthorized superadmin access attempt by {user_id} for command {func.__name__}")
+
+                await update.message.reply_text("You are not authorized to use this command.")
+
+                return
+
+            return await func(update, context, *args, **kwargs)
+
+        except Exception as e:
+            logger.error(f"Error in superadmin_required decorator: {e}")
+            await update.message.reply_text("An error occurred. Please try again later.")
+    
+    return wrapper
+
 def admin_required(func):
     async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
         try:

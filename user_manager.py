@@ -2,7 +2,7 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
 from db_queries import execute_db_query
-from decorators import admin_required
+from decorators import superadmin_required, admin_required
 import config
 from logger import Logger
 
@@ -142,7 +142,7 @@ async def remove_user(update: Update, context: CallbackContext):
         logger.error(f"Error removing user with ID {user_id_to_remove}: {e}")
         await update.message.reply_text("Failed to remove user. Please try again later.")
 
-@admin_required
+@superadmin_required
 async def make_admin(update: Update, context: CallbackContext):
     if len(context.args) != 1:
         await update.message.reply_text("Usage: /make_admin [user_id]")
@@ -165,7 +165,7 @@ async def make_admin(update: Update, context: CallbackContext):
         logger.error(f"Error making user with ID {user_id_to_admin} an admin: {e}")
         await update.message.reply_text("Failed to update user to admin. Please try again later.")
 
-@admin_required
+@superadmin_required
 async def revoke_admin(update: Update, context: CallbackContext):
     if len(context.args) != 1:
         await update.message.reply_text("Usage: /revoke_admin [user_id]")

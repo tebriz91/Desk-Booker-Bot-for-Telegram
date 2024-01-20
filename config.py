@@ -1,14 +1,14 @@
 import os
 
 # Bot Configuration
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 
 # Database Configuration
 DB_PATH = os.getenv('DB_PATH', 'data/database.db')
 
 # Admin Configuration
-ADMIN_USER_ID = os.getenv('ADMIN_USER_ID')
-ADMIN_USERNAME = os.getenv('ADMIN_USERNAME')
+ADMIN_USER_ID = os.environ.get('ADMIN_USER_ID')
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 
 # Logging Time Zone Configuration
 LOG_TIMEZONE = os.getenv('LOG_TIMEZONE', 'default_timezone')

@@ -7,7 +7,7 @@ from telegram.ext import CommandHandler, CallbackQueryHandler, ApplicationBuilde
 
 import config
 
-from db_initializer import initialize_database, initialize_admin_user
+from db_initializer import initialize_database, initialize_superadmin_user
 
 from user_manager import start_command, add_user, remove_user, make_admin, revoke_admin, delist_user, list_user, view_users
 
@@ -24,7 +24,7 @@ def main():
 
     # Asynchronously initialize the database and admin user
     loop.create_task(initialize_database())
-    loop.create_task(initialize_admin_user())
+    loop.create_task(initialize_superadmin_user())
 
     # Create an instance of Application
     application = ApplicationBuilder().token(config.BOT_TOKEN).build()

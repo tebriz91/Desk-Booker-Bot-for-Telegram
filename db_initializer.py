@@ -65,7 +65,7 @@ async def initialize_database():
 
         await conn.commit()
 
-async def initialize_admin_user():
+async def initialize_superadmin_user():
     admin_user_id = config.ADMIN_USER_ID
     admin_username = config.ADMIN_USERNAME
     admin_user_exists = await execute_db_query("SELECT user_id FROM users WHERE user_id = ?", (admin_user_id,), fetch_one=True)

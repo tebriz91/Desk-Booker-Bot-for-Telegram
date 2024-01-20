@@ -1,4 +1,7 @@
 .env
 data
 assets
+concatenation-script.py
+prompt.py
+config.py
 ```

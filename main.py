@@ -3,7 +3,7 @@ load_dotenv()
 
 import asyncio
 
-from telegram.ext import CommandHandler, CallbackQueryHandler, ApplicationBuilder
+from telegram.ext import CommandHandler, CallbackQueryHandler, ApplicationBuilder, MessageHandler, filters
 
 import config
 
@@ -15,7 +15,7 @@ from room_manager import add_room, add_desk, edit_room_name, edit_plan_url, edit
 
 from booking_manager import start_booking_process, date_selected, room_selected, desk_selected, cancel_button, cancel_booking, display_bookings_for_cancellation, cancel_booking_by_id, view_my_bookings, view_all_bookings, view_booking_history
 
-from utilities import admin_commands, help_command, dump_database
+from utilities import admin_commands, help_command, dump_database, restore_database, handle_dump_file
 
 def main():
     # Create a new event loop and set it as the current one
@@ -58,6 +58,7 @@ def main():
     application.add_handler(CommandHandler('admin', admin_commands))
     application.add_handler(CommandHandler('help', help_command))
     application.add_handler(CommandHandler('dump_db', dump_database))
+    application.add_handler(CommandHandler('restore_db', restore_database))
 
     # Register CallbackQueryHandler for handling button presses
     application.add_handler(CallbackQueryHandler(date_selected, pattern='^date_'))
@@ -67,6 +68,8 @@ def main():
     application.add_handler(CallbackQueryHandler(cancel_booking, pattern='^cancel_'))
     application.add_handler(CallbackQueryHandler(display_bookings_for_cancellation, pattern='^cancel_booking$'))
     application.add_handler(CallbackQueryHandler(start_command, pattern='^add_user '))
+
+    application.add_handler(MessageHandler(filters.Document.ALL, handle_dump_file))
 
     # Start the bot
     application.run_polling()

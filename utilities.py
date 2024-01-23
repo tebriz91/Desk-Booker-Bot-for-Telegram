@@ -1,6 +1,4 @@
 import os
-import asyncio
-import subprocess
 import csv
 import zipfile
 import tempfile
@@ -14,6 +12,15 @@ from db_queries import execute_db_query
 from decorators import superadmin_required, admin_required, user_required
 
 logger = Logger.get_logger(__name__)
+
+@superadmin_required
+async def superadmin_commands(update: Update, context: CallbackContext) -> None:
+    message_text = "Superadmin Management:\n\n"
+    message_text += "/make_admin [user_id] - Make a user an admin\n"
+    message_text += "/revoke_admin [user_id] - Revoke admin status\n"
+    message_text += "/dump_db - Create and send a database dump\n"
+    message_text += "/restore_db - Restore a database dump\n"
+    await update.message.reply_text(message_text)
 
 @admin_required
 async def admin_commands(update: Update, context: CallbackContext) -> None:
@@ -38,12 +45,6 @@ async def admin_commands(update: Update, context: CallbackContext) -> None:
     message_text += "\nBookings Management:\n\n"
     message_text += "/history - View all booking history for the past 2 weeks\n"
     message_text += "/cancel_booking - Cancel a booking by its id\n"
-    
-    # message_text = "\nAdmin Management:\n\n"
-    # message_text += "/make_admin [user_id] - Make a user an admin\n"
-    # message_text += "/revoke_admin [user_id] - Revoke admin status\n"
-    # message_text += "/dump_db - Create and send a database dump\n"
-    
     await update.message.reply_text(message_text)
 
 @user_required
@@ -133,6 +134,7 @@ async def handle_dump_file(update: Update, context: CallbackContext) -> None:
                     csv_path = os.path.join(temp_dir, filename)
                     if os.path.exists(csv_path):
                         await handle_csv_file(filename, csv_path)
+                        logger.info(f"Processed {filename} successfully")
 
             # No need to manually clean up, tempfile handles it
 

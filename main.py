@@ -15,7 +15,7 @@ from room_manager import add_room, add_desk, edit_room_name, edit_plan_url, edit
 
 from booking_manager import start_booking_process, date_selected, room_selected, desk_selected, cancel_button, cancel_booking, display_bookings_for_cancellation, cancel_booking_by_id, view_my_bookings, view_all_bookings, view_booking_history
 
-from utilities import admin_commands, help_command, dump_database, restore_database, handle_dump_file
+from utilities import superadmin_commands, admin_commands, help_command, dump_database, restore_database, handle_dump_file
 
 def main():
     # Create a new event loop and set it as the current one
@@ -29,16 +29,23 @@ def main():
     # Create an instance of Application
     application = ApplicationBuilder().token(config.BOT_TOKEN).build()
     
-    # Register handlers
+    # Register handlers for booking-related commands
     application.add_handler(CommandHandler('start', start_command))
-    application.add_handler(CommandHandler('start', start_command))
+    application.add_handler(CommandHandler('book', start_booking_process))
+    application.add_handler(CommandHandler("cancel", display_bookings_for_cancellation))
+    application.add_handler(CommandHandler("cancel_booking", cancel_booking_by_id))
+    application.add_handler(CommandHandler("my_bookings", view_my_bookings))
+    application.add_handler(CommandHandler("all_bookings", view_all_bookings))
+    application.add_handler(CommandHandler("history", view_booking_history))
+
+    # Register CommandHandlers for user management
     application.add_handler(CommandHandler('add_user', add_user))
     application.add_handler(CommandHandler('remove_user', remove_user))
-    application.add_handler(CommandHandler('make_admin', make_admin))
-    application.add_handler(CommandHandler('revoke_admin', revoke_admin))
     application.add_handler(CommandHandler('delist_user', delist_user))
     application.add_handler(CommandHandler('list_user', list_user))
     application.add_handler(CommandHandler('view_users', view_users))
+
+    # Register CommandHandlers for room and desk management
     application.add_handler(CommandHandler('add_room', add_room))
     application.add_handler(CommandHandler('add_desk', add_desk))
     application.add_handler(CommandHandler('edit_room_name', edit_room_name))
@@ -49,16 +56,17 @@ def main():
     application.add_handler(CommandHandler('remove_room', remove_room))
     application.add_handler(CommandHandler('remove_desk', remove_desk))
     application.add_handler(CommandHandler('view_rooms', view_rooms))
-    application.add_handler(CommandHandler('book', start_booking_process))
-    application.add_handler(CommandHandler("cancel", display_bookings_for_cancellation))
-    application.add_handler(CommandHandler("cancel_booking", cancel_booking_by_id))
-    application.add_handler(CommandHandler("my_bookings", view_my_bookings))
-    application.add_handler(CommandHandler("all_bookings", view_all_bookings))
-    application.add_handler(CommandHandler("history", view_booking_history))
-    application.add_handler(CommandHandler('admin', admin_commands))
-    application.add_handler(CommandHandler('help', help_command))
+
+    # Register CommandHandlers for superadmin management
+    application.add_handler(CommandHandler('make_admin', make_admin))
+    application.add_handler(CommandHandler('revoke_admin', revoke_admin))
     application.add_handler(CommandHandler('dump_db', dump_database))
     application.add_handler(CommandHandler('restore_db', restore_database))
+
+    # Register CommandHandlers for command-specific help
+    application.add_handler(CommandHandler('superadmin', superadmin_commands))
+    application.add_handler(CommandHandler('admin', admin_commands))
+    application.add_handler(CommandHandler('help', help_command))
 
     # Register CallbackQueryHandler for handling button presses
     application.add_handler(CallbackQueryHandler(date_selected, pattern='^date_'))
